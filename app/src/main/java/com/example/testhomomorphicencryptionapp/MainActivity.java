@@ -12,6 +12,8 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.util.Log;
+import android.util.TimingLogger;
 import android.view.View;
 import android.widget.TextView;
 
@@ -37,6 +39,10 @@ public class MainActivity extends AppCompatActivity {
 
     private byte[] encryptedData;
     private double[] decryptedData;
+
+    private static final String TAG = "MainActivity";
+
+    TimingLogger timings = new TimingLogger(TAG, "EDPS");
 
     // This method sets a parameter object and returns the object as a byte array
     public native byte[] setParameters();
@@ -122,11 +128,16 @@ public class MainActivity extends AppCompatActivity {
 
         // Begin encrypt/decrypt per second calculation in s
         long startTime = System.nanoTime();
-        int max = 5;
+        int max = 100;
         for (int i = 0; i < max; i++){
+            timings.addSplit("start");
             this.setEncryptedData(encryptDoubleArray(this.parms, this.pubKey, unencryptedData));
+            timings.addSplit("E " + Integer.toString(i));
             this.setDecryptedData(decryptDoubleArray(this.parms, this.privKey, this.encryptedData));
+            timings.addSplit("D " + Integer.toString(i));
+            timings.addSplit("end");
         }
+        timings.dumpToLog();
         long endTime = System.nanoTime();
         double duration = (double)(endTime - startTime);
         double EDPS = ((double)max) / (duration/1000000000);

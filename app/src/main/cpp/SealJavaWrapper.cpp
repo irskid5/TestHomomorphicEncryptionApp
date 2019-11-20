@@ -17,6 +17,8 @@
 using namespace std;
 using namespace seal;
 
+shared_ptr<SEALContext> context;
+
 extern "C"
 JNIEXPORT jbyteArray JNICALL
 Java_com_example_testhomomorphicencryptionapp_MainActivity_setParameters
@@ -50,25 +52,27 @@ Java_com_example_testhomomorphicencryptionapp_MainActivity_setParameters
 	jbyteArray result = env->NewByteArray(size);
 	env->SetByteArrayRegion(result, 0, size, (jbyte*)cstr);
 
+	context = SEALContext::Create(parms);
+
 	return result;
 }
 extern "C"
 JNIEXPORT jbyteArray JNICALL Java_com_example_testhomomorphicencryptionapp_MainActivity_getPrivateKey
 (JNIEnv *env, jobject obj, jbyteArray parmsJBA) 
 {
-	jboolean isCopy;
-	jbyte* rawjBytes = env->GetByteArrayElements(parmsJBA, &isCopy);
-	char* rawBytes = (char *)rawjBytes;
-	int rawSize = env->GetArrayLength(parmsJBA);
-	string rawByteStr(rawBytes, rawSize);
+	//jboolean isCopy;
+	//jbyte* rawjBytes = env->GetByteArrayElements(parmsJBA, &isCopy);
+	//char* rawBytes = (char *)rawjBytes;
+	//int rawSize = env->GetArrayLength(parmsJBA);
+	//string rawByteStr(rawBytes, rawSize);
 
-	stringstream in(rawByteStr);
+	//stringstream in(rawByteStr);
 
-	EncryptionParameters parms(scheme_type::CKKS);
+	//EncryptionParameters parms(scheme_type::CKKS);
 	stringstream out;
 	try {
-		parms.load(in);
-		auto context = SEALContext::Create(parms);
+		//parms.load(in);
+		//auto context = SEALContext::Create(parms);
 		KeyGenerator keygen(context);
 		auto privateKey = keygen.secret_key();
 		privateKey.save(out);
@@ -97,11 +101,11 @@ extern "C"
 JNIEXPORT jbyteArray JNICALL Java_com_example_testhomomorphicencryptionapp_MainActivity_getPublicKey
 (JNIEnv *env, jobject obj, jbyteArray parmsJBA, jbyteArray privateKey)
 {
-	jboolean isCopyParms;
-	jbyte* rawjBytesParms = env->GetByteArrayElements(parmsJBA, &isCopyParms);
-	char* rawBytesParms = (char *)rawjBytesParms;
-	int rawSizeParms = env->GetArrayLength(parmsJBA);
-	string rawByteStrParms(rawBytesParms, rawSizeParms);
+	//jboolean isCopyParms;
+	//jbyte* rawjBytesParms = env->GetByteArrayElements(parmsJBA, &isCopyParms);
+	//char* rawBytesParms = (char *)rawjBytesParms;
+	//int rawSizeParms = env->GetArrayLength(parmsJBA);
+	//string rawByteStrParms(rawBytesParms, rawSizeParms);
 
 	jboolean isCopyKey;
 	jbyte* rawjBytesKey = env->GetByteArrayElements(privateKey, &isCopyKey);
@@ -109,15 +113,15 @@ JNIEXPORT jbyteArray JNICALL Java_com_example_testhomomorphicencryptionapp_MainA
 	int rawSizeKey = env->GetArrayLength(privateKey);
 	string rawByteStrKey(rawBytesKey, rawSizeKey);
 
-	stringstream inParms(rawByteStrParms);
+	//stringstream inParms(rawByteStrParms);
 	stringstream inKey(rawByteStrKey);
 
-	EncryptionParameters parms(scheme_type::CKKS);
+	//EncryptionParameters parms(scheme_type::CKKS);
 	SecretKey privateKeyIn;
 	stringstream out;
 	try {
-		parms.load(inParms);
-		auto context = SEALContext::Create(parms);
+		//parms.load(inParms);
+		//auto context = SEALContext::Create(parms);
 		privateKeyIn.load(context, inKey);
 		KeyGenerator keygen(context, privateKeyIn);
 		auto publicKey = keygen.public_key();
@@ -148,11 +152,11 @@ JNIEXPORT jbyteArray JNICALL Java_com_example_testhomomorphicencryptionapp_MainA
 (JNIEnv *env, jobject obj, jbyteArray parmsJBA, jbyteArray publicKey, jdoubleArray data)
 {
 
-	jboolean isCopyParms;
-	jbyte* rawjBytesParms = env->GetByteArrayElements(parmsJBA, &isCopyParms);
-	char* rawBytesParms = (char *)rawjBytesParms;
-	int rawSizeParms = env->GetArrayLength(parmsJBA);
-	string rawByteStrParms(rawBytesParms, rawSizeParms);
+	//jboolean isCopyParms;
+	//jbyte* rawjBytesParms = env->GetByteArrayElements(parmsJBA, &isCopyParms);
+	//char* rawBytesParms = (char *)rawjBytesParms;
+	//int rawSizeParms = env->GetArrayLength(parmsJBA);
+	//string rawByteStrParms(rawBytesParms, rawSizeParms);
 
 	jboolean isCopyKey;
 	jbyte* rawjBytesKey = env->GetByteArrayElements(publicKey, &isCopyKey);
@@ -171,15 +175,15 @@ JNIEXPORT jbyteArray JNICALL Java_com_example_testhomomorphicencryptionapp_MainA
 
 	//cout << rawSizeData << endl;
 
-	stringstream inParms(rawByteStrParms);
+	//stringstream inParms(rawByteStrParms);
 	stringstream inKey(rawByteStrKey);
 
-	EncryptionParameters parms(scheme_type::CKKS);
+	//EncryptionParameters parms(scheme_type::CKKS);
 	PublicKey publicKeyIn;
 	stringstream out;
-	try {
-		parms.load(inParms);
-		auto context = SEALContext::Create(parms);
+    try {
+		//parms.load(inParms);
+		//auto context = SEALContext::Create(parms);
 		publicKeyIn.load(context, inKey);
 		Encryptor encryptor(context, publicKeyIn);
 		CKKSEncoder encoder(context);
@@ -189,14 +193,16 @@ JNIEXPORT jbyteArray JNICALL Java_com_example_testhomomorphicencryptionapp_MainA
 		encoder.encode(datav, scale, plain);
 
 		Ciphertext encrypted;
-		encryptor.encrypt(plain, encrypted);
+        auto t1 = std::chrono::high_resolution_clock::now();
+        encryptor.encrypt(plain, encrypted);
+        auto t2 = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double, std::milli> fp_ms = t2 - t1;
 
 		encrypted.save(out);
 	}
 	catch (std::exception& e) {
 		cerr << e.what() << endl;
 	}
-
 	const string tmp = out.str();
 	const char* cstr = tmp.c_str();
 
@@ -219,11 +225,11 @@ JNIEXPORT jdoubleArray JNICALL Java_com_example_testhomomorphicencryptionapp_Mai
 (JNIEnv *env, jobject obj, jbyteArray parmsJBA, jbyteArray privateKey, jbyteArray data)
 {
 
-	jboolean isCopyParms;
-	jbyte* rawjBytesParms = env->GetByteArrayElements(parmsJBA, &isCopyParms);
-	char* rawBytesParms = (char *)rawjBytesParms;
-	int rawSizeParms = env->GetArrayLength(parmsJBA);
-	string rawByteStrParms(rawBytesParms, rawSizeParms);
+	//jboolean isCopyParms;
+	//jbyte* rawjBytesParms = env->GetByteArrayElements(parmsJBA, &isCopyParms);
+	//char* rawBytesParms = (char *)rawjBytesParms;
+	//int rawSizeParms = env->GetArrayLength(parmsJBA);
+	//string rawByteStrParms(rawBytesParms, rawSizeParms);
 
 	jboolean isCopyKey;
 	jbyte* rawjBytesKey = env->GetByteArrayElements(privateKey, &isCopyKey);
@@ -237,11 +243,11 @@ JNIEXPORT jdoubleArray JNICALL Java_com_example_testhomomorphicencryptionapp_Mai
 	int rawSizeData = env->GetArrayLength(data);
 	string rawByteStrData(rawBytesData, rawSizeData);
 
-	stringstream inParms(rawByteStrParms);
+	//stringstream inParms(rawByteStrParms);
 	stringstream inKey(rawByteStrKey);
 	stringstream inData(rawByteStrData);
 
-	EncryptionParameters parms(scheme_type::CKKS);
+	//EncryptionParameters parms(scheme_type::CKKS);
 	SecretKey privateKeyIn;
 	Ciphertext encrypted;
 	Plaintext plain;
@@ -249,8 +255,8 @@ JNIEXPORT jdoubleArray JNICALL Java_com_example_testhomomorphicencryptionapp_Mai
 	vector<double> out;
 
 	try {
-		parms.load(inParms);
-		auto context = SEALContext::Create(parms);
+		//parms.load(inParms);
+		//auto context = SEALContext::Create(parms);
 		privateKeyIn.load(context, inKey);
 		encrypted.load(context, inData);
 
