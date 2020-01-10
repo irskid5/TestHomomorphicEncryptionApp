@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.4.1)
 
 add_library(SealJavaWrapper
             SHARED
-            src/main/cpp/SealJavaWrapper.cpp)
+            src/main/cpp/SealJavaWrapper.cpp
+            src/main/cpp/base64.cpp)
 
 include_directories(../external/SEAL/native/src)
 

@@ -33,11 +33,11 @@ public class MainActivity extends AppCompatActivity {
     private TextView longRead;
     private TextView latRead;
 
-    private byte[] parms;
-    private byte[] privKey;
-    private byte[] pubKey;
+    private String parms;
+    private String privKey;
+    private String pubKey;
 
-    private byte[] encryptedData;
+    private String encryptedData;
     private double[] decryptedData;
 
     private static final String TAG = "MainActivity";
@@ -45,19 +45,19 @@ public class MainActivity extends AppCompatActivity {
     TimingLogger timings = new TimingLogger(TAG, "EDPS");
 
     // This method sets a parameter object and returns the object as a byte array
-    public native byte[] setParameters();
+    public native String setParameters();
 
     // This method sets a private key given a parameters object and returns the object as a byte array
-    public native byte[] getPrivateKey(byte[] parms);
+    public native String getPrivateKey(String parms);
 
     // This method sets a public key given a parameters object and private key and returns the object as a byte array
-    public native byte[] getPublicKey(byte[] parms, byte[] privateKey);
+    public native String getPublicKey(String parms, String privateKey);
 
     // This method encrypts an array of doubles given parameters, public key, and data objects and returns the encrypted data as a byte array
-    public native byte[] encryptDoubleArray(byte[] parms, byte[] publicKey, double[] data);
+    public native String encryptDoubleArray(String parms, String publicKey, double[] data);
 
     // This method decrypts an array of doubles given parameters, private key, and data objects and returns the decrypted data as a double array
-    public native double[] decryptDoubleArray(byte[] parms, byte[] privateKey, byte[] data);
+    public native double[] decryptDoubleArray(String parms, String privateKey, String data);
 
     static {
         System.loadLibrary("SealJavaWrapper");
@@ -104,7 +104,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void decrypt(View view) {
-        if (this.encryptedData.length == 0) {
+        if (this.encryptedData.length() == 0) {
             System.out.println("Please enter values to encrypt before decrypting!");
             return;
         }
@@ -179,7 +179,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void decryptGPSLocation(View view){
-        if (this.encryptedData.length == 0) {
+        if (this.encryptedData.length() == 0) {
             System.out.println("Please encrypt GPS coordinates before decrypting!");
             return;
         }
@@ -236,19 +236,19 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void setParms(byte[] parms) {
+    public void setParms(String parms) {
         this.parms = parms;
     }
 
-    public void setPrivKey(byte[] privKey) {
+    public void setPrivKey(String privKey) {
         this.privKey = privKey;
     }
 
-    public void setPubKey(byte[] pubKey) {
+    public void setPubKey(String pubKey) {
         this.pubKey = pubKey;
     }
 
-    public void setEncryptedData(byte[] encryptedData) {
+    public void setEncryptedData(String encryptedData) {
         this.encryptedData = encryptedData;
     }
 

@@ -12,7 +12,7 @@ extern "C" {
  * Method:    setParameters
  * Signature: ()[B
  */
-JNIEXPORT jbyteArray JNICALL Java_com_example_testhomomorphicencryptionapp_MainActivity_setParameters
+JNIEXPORT jstring JNICALL Java_com_example_testhomomorphicencryptionapp_MainActivity_setParameters
   (JNIEnv *, jobject);
 
 /*
@@ -20,24 +20,24 @@ JNIEXPORT jbyteArray JNICALL Java_com_example_testhomomorphicencryptionapp_MainA
 * Method : getPrivateKey
 * Signature : ([B)[B
 */
-JNIEXPORT jbyteArray JNICALL Java_com_example_testhomomorphicencryptionapp_MainActivity_getPrivateKey
-(JNIEnv *, jobject, jbyteArray);
+JNIEXPORT jstring JNICALL Java_com_example_testhomomorphicencryptionapp_MainActivity_getPrivateKey
+(JNIEnv *, jobject, jstring);
 
 /*
  * Class:     vele_thesis_SealJavaWrapper
  * Method:    getPublicKey
  * Signature: ([B[B)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_com_example_testhomomorphicencryptionapp_MainActivity_getPublicKey
-(JNIEnv *, jobject, jbyteArray, jbyteArray);
+JNIEXPORT jstring JNICALL Java_com_example_testhomomorphicencryptionapp_MainActivity_getPublicKey
+(JNIEnv *, jobject, jstring, jstring);
 
 /*
  * Class:     vele_thesis_SealJavaWrapper
  * Method:    encryptDoubleArray
  * Signature: ([B[B[D)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_com_example_testhomomorphicencryptionapp_MainActivity_encryptDoubleArray
-(JNIEnv *, jobject, jbyteArray, jbyteArray, jdoubleArray);
+JNIEXPORT jstring JNICALL Java_com_example_testhomomorphicencryptionapp_MainActivity_encryptDoubleArray
+(JNIEnv *, jobject, jstring, jstring, jdoubleArray);
 
 /*
  * Class:     vele_thesis_SealJavaWrapper
@@ -45,7 +45,7 @@ JNIEXPORT jbyteArray JNICALL Java_com_example_testhomomorphicencryptionapp_MainA
  * Signature: ([B[B[B)[D
  */
 JNIEXPORT jdoubleArray JNICALL Java_com_example_testhomomorphicencryptionapp_MainActivity_decryptDoubleArray
-(JNIEnv *, jobject, jbyteArray, jbyteArray, jbyteArray);
+(JNIEnv *, jobject, jstring, jstring, jstring);
 
 #ifdef __cplusplus
 }
