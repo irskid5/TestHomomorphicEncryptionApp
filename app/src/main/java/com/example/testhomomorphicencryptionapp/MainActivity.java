@@ -12,10 +12,24 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.util.Log;
 import android.util.TimingLogger;
 import android.view.View;
 import android.widget.TextView;
+
+import com.android.volley.Request;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.JsonObjectRequest;
+
+import org.json.JSONObject;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.util.HashMap;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -33,31 +47,15 @@ public class MainActivity extends AppCompatActivity {
     private TextView longRead;
     private TextView latRead;
 
-    private String parms;
-    private String privKey;
-    private String pubKey;
+    private SEALConfig config;
 
     private String encryptedData;
     private double[] decryptedData;
 
     private static final String TAG = "MainActivity";
+    private static final String reqUrl = "https://aokuer9jgd.execute-api.us-east-2.amazonaws.com/dev/nearest";
 
     TimingLogger timings = new TimingLogger(TAG, "EDPS");
-
-    // This method sets a parameter object and returns the object as a byte array
-    public native String setParameters();
-
-    // This method sets a private key given a parameters object and returns the object as a byte array
-    public native String getPrivateKey(String parms);
-
-    // This method sets a public key given a parameters object and private key and returns the object as a byte array
-    public native String getPublicKey(String parms, String privateKey);
-
-    // This method encrypts an array of doubles given parameters, public key, and data objects and returns the encrypted data as a byte array
-    public native String encryptDoubleArray(String parms, String publicKey, double[] data);
-
-    // This method decrypts an array of doubles given parameters, private key, and data objects and returns the decrypted data as a double array
-    public native double[] decryptDoubleArray(String parms, String privateKey, String data);
 
     static {
         System.loadLibrary("SealJavaWrapper");
@@ -79,12 +77,53 @@ public class MainActivity extends AppCompatActivity {
 
         this.locationManager = (LocationManager)getSystemService(Context.LOCATION_SERVICE);
 
-        // Create parameters object
-        this.setParms(setParameters());
+        SEALConfig tmp = loadSEALConfig("SEALConfig.txt");
+        if (tmp == null) {
+            this.config.setParams(this.setParameters());
+            this.config.setPrivateKey(this.getPrivateKey(this.config.getParams()));
+            this.config.setPublicKey(this.getPublicKey(this.config.getParams(), this.config.getPrivateKey()));
+            this.saveSEALConfig(this.config, "SEALConfig.txt");
+        } else {
+            this.config = tmp;
+        }
 
-        // Create private/public key pair
-        this.setPrivKey(this.getPrivateKey(this.parms));
-        this.setPubKey(this.getPublicKey(this.parms, this.privKey));
+    }
+
+    public void saveSEALConfig(SEALConfig SEALConfig, String fileName){
+        FileOutputStream f = null;
+        ObjectOutputStream o = null;
+        try {
+            f = new FileOutputStream(new File(fileName));
+            o = new ObjectOutputStream(f);
+
+            // Write objects to file
+            o.writeObject(SEALConfig);
+
+            o.close();
+            f.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public SEALConfig loadSEALConfig(String fileName){
+        SEALConfig config = new SEALConfig();
+
+        FileInputStream f = null;
+        ObjectInputStream i = null;
+        try {
+            f = new FileInputStream(new File(fileName));
+            i = new ObjectInputStream(f);
+
+            config = (SEALConfig) i.readObject();
+        } catch (ClassNotFoundException | IOException e) {
+            e.printStackTrace();
+        }
+
+        if (config.isEmpty()) {
+            return null;
+        }
+        return config;
     }
 
     public void encrypt(View view) {
@@ -94,7 +133,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Begin encryption
         double[] unencryptedData = new double[]{dec0, dec1, dec2};
-        this.setEncryptedData(encryptDoubleArray(this.parms, this.pubKey, unencryptedData));
+        this.setEncryptedData(encryptDoubleArray(this.config.getParams(), this.config.getPublicKey(), unencryptedData));
 
         System.out.printf("Encrypted array: [ %f, %f, %f ]\n", unencryptedData[0],
                 unencryptedData[1], unencryptedData[2]);
@@ -110,7 +149,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // Begin decryption
-        this.setDecryptedData(decryptDoubleArray(this.parms, this.privKey, this.encryptedData));
+        this.setDecryptedData(decryptDoubleArray(this.config.getParams(), this.config.getPrivateKey(), this.encryptedData));
 
         System.out.printf("Decrypted array: [ %f, %f, %f ]\n", this.decryptedData[0], this.decryptedData[1], this.decryptedData[2]);
         System.out.println("Decrypted!");
@@ -131,9 +170,9 @@ public class MainActivity extends AppCompatActivity {
         int max = 100;
         for (int i = 0; i < max; i++){
             timings.addSplit("start");
-            this.setEncryptedData(encryptDoubleArray(this.parms, this.pubKey, unencryptedData));
+            this.setEncryptedData(encryptDoubleArray(this.config.getParams(), this.config.getPublicKey(), unencryptedData));
             timings.addSplit("E " + Integer.toString(i));
-            this.setDecryptedData(decryptDoubleArray(this.parms, this.privKey, this.encryptedData));
+            this.setDecryptedData(decryptDoubleArray(this.config.getParams(), this.config.getPrivateKey(), this.encryptedData));
             timings.addSplit("D " + Integer.toString(i));
             timings.addSplit("end");
         }
@@ -169,7 +208,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         double[] unencryptedData = new double[]{this.longitude, this.latitude};
-        this.setEncryptedData(encryptDoubleArray(this.parms, this.pubKey, unencryptedData));
+        this.setEncryptedData(encryptDoubleArray(this.config.getParams(), this.config.getPublicKey(), unencryptedData));
 
         System.out.printf("Encrypted array: [ %f, %f ]\n", unencryptedData[0],
                 unencryptedData[1]);
@@ -185,7 +224,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // Begin decryption
-        this.setDecryptedData(decryptDoubleArray(this.parms, this.privKey, this.encryptedData));
+        this.setDecryptedData(decryptDoubleArray(this.config.getParams(), this.config.getPrivateKey(), this.encryptedData));
 
         System.out.printf("Decrypted array: [ %f, %f ]\n", this.decryptedData[0],
                 this.decryptedData[1]);
@@ -193,6 +232,48 @@ public class MainActivity extends AppCompatActivity {
         this.EDPSRead.setText(String.format("Decrypted array: [ %f, %f ]\n", this.decryptedData[0],
                 this.decryptedData[1]));
     }
+
+    public void onRequest(View view){
+        // Create request body
+        HashMap<String, String> params = new HashMap<>();
+        params.put("params", this.config.getParams());
+        params.put("key", this.config.getPrivateKey());
+        params.put("data", this.encryptedData);
+
+        JsonObjectRequest jsonObjectRequest = new JsonObjectRequest
+                (Request.Method.POST, reqUrl, new JSONObject(params), new Response.Listener<JSONObject>() {
+
+                    @Override
+                    public void onResponse(JSONObject response) {
+                        EDPSRead.setText("Resp: " + response.toString());
+                    }
+                }, new Response.ErrorListener() {
+
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        // Handle error
+                        EDPSRead.setText("Resp Err: " + error.getMessage());
+                    }
+                });
+
+        // Access the RequestQueue through your singleton class.
+        MySingleton.getInstance(this).addToRequestQueue(jsonObjectRequest);
+    }
+
+    // This method sets a parameter object and returns the object as a byte array
+    public native String setParameters();
+
+    // This method sets a private key given a parameters object and returns the object as a byte array
+    public native String getPrivateKey(String parms);
+
+    // This method sets a public key given a parameters object and private key and returns the object as a byte array
+    public native String getPublicKey(String parms, String privateKey);
+
+    // This method encrypts an array of doubles given parameters, public key, and data objects and returns the encrypted data as a byte array
+    public native String encryptDoubleArray(String parms, String publicKey, double[] data);
+
+    // This method decrypts an array of doubles given parameters, private key, and data objects and returns the decrypted data as a double array
+    public native double[] decryptDoubleArray(String parms, String privateKey, String data);
 
     /*----------Method to create an AlertBox ------------- */
     protected void alertbox(String title, String mymessage) {
@@ -234,18 +315,6 @@ public class MainActivity extends AppCompatActivity {
         } else {
             return false;
         }
-    }
-
-    public void setParms(String parms) {
-        this.parms = parms;
-    }
-
-    public void setPrivKey(String privKey) {
-        this.privKey = privKey;
-    }
-
-    public void setPubKey(String pubKey) {
-        this.pubKey = pubKey;
     }
 
     public void setEncryptedData(String encryptedData) {

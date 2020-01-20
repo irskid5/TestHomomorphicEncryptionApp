@@ -50,6 +50,7 @@ std::string base64_encode(const uint8_t *data, size_t length)
         output.push_back('=');
     }
     else if(length - i == 3)
+
     {
         int value1 = data[i] >> 2;
         output.push_back(binaryToBase64Table[value1]);

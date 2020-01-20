@@ -9,6 +9,7 @@
 #include <thread>
 #include <mutex>
 #include <memory>
+#include <codecvt>
 #include <limits>
 #include <algorithm>
 #include <numeric>
@@ -63,19 +64,10 @@ Java_com_example_testhomomorphicencryptionapp_MainActivity_setParameters
 	parms.set_poly_modulus_degree(poly_modulus_degree);
 	parms.set_coeff_modulus(CoeffModulus::Create(
 		poly_modulus_degree, { 30, 24, 24, 30 }));
-	stringstream out;
-	try {
-		parms.save(out);
-        parms.load(out);
-	}
-	catch (exception& e) {
-		cerr << e.what() << endl;
-	}
 
-	const string tmp = out.str();
-    const string resStr = base64_encode(tmp);
-
-    jstring result = env->NewStringUTF(resStr.c_str());
+	const string input = encodeSealToBase64(parms);
+	cout << input << endl;
+    jstring result = env->NewStringUTF(input.c_str());
 
 	context = SEALContext::Create(parms);
 
