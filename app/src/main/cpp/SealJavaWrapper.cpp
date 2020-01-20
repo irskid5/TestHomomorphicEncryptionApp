@@ -65,9 +65,7 @@ Java_com_example_testhomomorphicencryptionapp_MainActivity_setParameters
 	parms.set_coeff_modulus(CoeffModulus::Create(
 		poly_modulus_degree, { 30, 24, 24, 30 }));
 
-	const string input = encodeSealToBase64(parms);
-	cout << input << endl;
-    jstring result = env->NewStringUTF(input.c_str());
+    jstring result = env->NewStringUTF(encodeSealToBase64(parms).c_str());
 
 	context = SEALContext::Create(parms);
 

@@ -79,6 +79,7 @@ public class MainActivity extends AppCompatActivity {
 
         SEALConfig tmp = loadSEALConfig("SEALConfig.txt");
         if (tmp == null) {
+            this.config = new SEALConfig();
             this.config.setParams(this.setParameters());
             this.config.setPrivateKey(this.getPrivateKey(this.config.getParams()));
             this.config.setPublicKey(this.getPublicKey(this.config.getParams(), this.config.getPrivateKey()));
