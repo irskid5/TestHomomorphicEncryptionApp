@@ -173,9 +173,9 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:onClick="onRequest"
-        android:text="Request"
+        android:text="Send Location"
         app:layout_constraintBottom_toTopOf="@+id/textView"
-        app:layout_constraintEnd_toStartOf="@+id/textView"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/EDPSRead" />
 

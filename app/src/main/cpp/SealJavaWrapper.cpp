@@ -21,11 +21,6 @@ using namespace seal;
 
 shared_ptr<SEALContext> context;
 
-/**
- * Takes a SEAL object and encodes it to a Base64 string
- *
- * @param object The SEAL object to encode
- */
 template <typename T>
 static string encodeSealToBase64(const T &object)
 {
@@ -148,10 +143,7 @@ JNIEXPORT jstring JNICALL Java_com_example_testhomomorphicencryptionapp_MainActi
 		encoder.encode(datav, scale, plain);
 
 		Ciphertext encrypted;
-        auto t1 = std::chrono::high_resolution_clock::now();
         encryptor.encrypt(plain, encrypted);
-        auto t2 = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double, std::milli> fp_ms = t2 - t1;
 
 		encrypted.save(out);
 	}

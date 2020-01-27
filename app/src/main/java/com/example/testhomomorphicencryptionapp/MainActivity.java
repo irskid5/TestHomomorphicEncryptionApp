@@ -12,6 +12,7 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.util.Log;
 import android.util.TimingLogger;
 import android.view.View;
 import android.widget.TextView;
@@ -25,10 +26,13 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
+import java.io.StreamCorruptedException;
 import java.util.HashMap;
 
 public class MainActivity extends AppCompatActivity {
@@ -85,23 +89,20 @@ public class MainActivity extends AppCompatActivity {
             this.config.setPublicKey(this.getPublicKey(this.config.getParams(), this.config.getPrivateKey()));
             this.saveSEALConfig(this.config, "SEALConfig.txt");
         } else {
+            String junk = this.setParameters();
             this.config = tmp;
         }
 
     }
 
     public void saveSEALConfig(SEALConfig SEALConfig, String fileName){
-        FileOutputStream f = null;
-        ObjectOutputStream o = null;
+        ObjectOutput out = null;
         try {
-            f = new FileOutputStream(new File(fileName));
-            o = new ObjectOutputStream(f);
-
-            // Write objects to file
-            o.writeObject(SEALConfig);
-
-            o.close();
-            f.close();
+            out = new ObjectOutputStream(new FileOutputStream(new File(getFilesDir(),"")+File.separator+fileName));
+            out.writeObject(SEALConfig);
+            out.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -110,14 +111,19 @@ public class MainActivity extends AppCompatActivity {
     public SEALConfig loadSEALConfig(String fileName){
         SEALConfig config = new SEALConfig();
 
-        FileInputStream f = null;
-        ObjectInputStream i = null;
+        ObjectInputStream input;
         try {
-            f = new FileInputStream(new File(fileName));
-            i = new ObjectInputStream(f);
-
-            config = (SEALConfig) i.readObject();
-        } catch (ClassNotFoundException | IOException e) {
+            input = new ObjectInputStream(new FileInputStream(new File(new File(getFilesDir(),"")+File.separator+fileName)));
+            config = (SEALConfig) input.readObject();
+            Log.v("serialization","Config Uid="+SEALConfig.getSerialVersionUID());
+            input.close();
+        } catch (StreamCorruptedException e) {
+            e.printStackTrace();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
             e.printStackTrace();
         }
 
@@ -167,17 +173,17 @@ public class MainActivity extends AppCompatActivity {
         double[] unencryptedData = new double[]{dec0, dec1, dec2};
 
         // Begin encrypt/decrypt per second calculation in s
-        long startTime = System.nanoTime();
         int max = 100;
+        long startTime = System.nanoTime();
         for (int i = 0; i < max; i++){
-            timings.addSplit("start");
+            //timings.addSplit("start");
             this.setEncryptedData(encryptDoubleArray(this.config.getParams(), this.config.getPublicKey(), unencryptedData));
-            timings.addSplit("E " + Integer.toString(i));
+            //timings.addSplit("E " + Integer.toString(i));
             this.setDecryptedData(decryptDoubleArray(this.config.getParams(), this.config.getPrivateKey(), this.encryptedData));
-            timings.addSplit("D " + Integer.toString(i));
-            timings.addSplit("end");
+            //timings.addSplit("D " + Integer.toString(i));
+            //timings.addSplit("end");
         }
-        timings.dumpToLog();
+        //timings.dumpToLog();
         long endTime = System.nanoTime();
         double duration = (double)(endTime - startTime);
         double EDPS = ((double)max) / (duration/1000000000);
@@ -191,7 +197,7 @@ public class MainActivity extends AppCompatActivity {
             locationListener = new MyLocationListener();
             try {
                 locationManager.requestLocationUpdates(LocationManager
-                        .GPS_PROVIDER, 5000, 10, locationListener);
+                        .GPS_PROVIDER, 5000, 5, locationListener);
             } catch (SecurityException e){
                 e.printStackTrace();
             }
@@ -236,29 +242,37 @@ public class MainActivity extends AppCompatActivity {
 
     public void onRequest(View view){
         // Create request body
-        HashMap<String, String> params = new HashMap<>();
-        params.put("params", this.config.getParams());
-        params.put("key", this.config.getPrivateKey());
-        params.put("data", this.encryptedData);
+        if (!Double.isNaN(this.latitude) || !Double.isNaN(this.longitude)) {
+            HashMap<String, String> params = new HashMap<>();
+            params.put("params", this.config.getParams());
+            params.put("key", this.config.getPrivateKey());
+            params.put("latitude", this.encryptDoubleArray(this.config.getParams(),
+                    this.config.getPublicKey(), new double[]{this.latitude}));
+            params.put("longitude", this.encryptDoubleArray(this.config.getParams(),
+                    this.config.getPublicKey(), new double[]{this.longitude}));
+            this.EDPSRead.setText("Location sent!");
 
-        JsonObjectRequest jsonObjectRequest = new JsonObjectRequest
-                (Request.Method.POST, reqUrl, new JSONObject(params), new Response.Listener<JSONObject>() {
+            JsonObjectRequest jsonObjectRequest = new JsonObjectRequest
+                    (Request.Method.POST, reqUrl, new JSONObject(params), new Response.Listener<JSONObject>() {
 
-                    @Override
-                    public void onResponse(JSONObject response) {
-                        EDPSRead.setText("Resp: " + response.toString());
-                    }
-                }, new Response.ErrorListener() {
+                        @Override
+                        public void onResponse(JSONObject response) {
+                            EDPSRead.setText("Resp: " + response.toString());
+                        }
+                    }, new Response.ErrorListener() {
 
-                    @Override
-                    public void onErrorResponse(VolleyError error) {
-                        // Handle error
-                        EDPSRead.setText("Resp Err: " + error.getMessage());
-                    }
-                });
+                        @Override
+                        public void onErrorResponse(VolleyError error) {
+                            // Handle error
+                            EDPSRead.setText("Resp Err: " + error.getMessage());
+                        }
+                    });
 
-        // Access the RequestQueue through your singleton class.
-        MySingleton.getInstance(this).addToRequestQueue(jsonObjectRequest);
+            // Access the RequestQueue through your singleton class.
+            MySingleton.getInstance(this).addToRequestQueue(jsonObjectRequest);
+        } else {
+            this.EDPSRead.setText("Location not sent, please select Get GPS Coordinates");
+        }
     }
 
     // This method sets a parameter object and returns the object as a byte array
