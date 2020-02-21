@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.util.Log;
@@ -17,11 +18,18 @@ import android.util.TimingLogger;
 import android.view.View;
 import android.widget.TextView;
 
+import com.android.volley.DefaultRetryPolicy;
 import com.android.volley.Request;
 import com.android.volley.Response;
+import com.android.volley.RetryPolicy;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
+import com.android.volley.toolbox.RequestFuture;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.android.gms.maps.model.LatLng;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
@@ -33,7 +41,14 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.io.StreamCorruptedException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -56,8 +71,13 @@ public class MainActivity extends AppCompatActivity {
     private String encryptedData;
     private double[] decryptedData;
 
+    private Response.ErrorListener errorListener;
+    private ExecutorService executor = Executors.newSingleThreadExecutor();
+    ObjectMapper mapper;
+
     private static final String TAG = "MainActivity";
     private static final String reqUrl = "https://aokuer9jgd.execute-api.us-east-2.amazonaws.com/dev/nearest";
+    private static final String reqUrl2 = "https://aokuer9jgd.execute-api.us-east-2.amazonaws.com/dev/GetLocationData";
 
     TimingLogger timings = new TimingLogger(TAG, "EDPS");
 
@@ -81,9 +101,20 @@ public class MainActivity extends AppCompatActivity {
 
         this.locationManager = (LocationManager)getSystemService(Context.LOCATION_SERVICE);
 
+        this.errorListener = new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                Log.e(TAG, error.toString());
+            }
+        };
+
+        this.mapper = new ObjectMapper();
+        mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
         SEALConfig tmp = loadSEALConfig("SEALConfig.txt");
         if (tmp == null) {
             this.config = new SEALConfig();
+            this.config.setSerialVersionUID(UUID.randomUUID().toString());
             this.config.setParams(this.setParameters());
             this.config.setPrivateKey(this.getPrivateKey(this.config.getParams()));
             this.config.setPublicKey(this.getPublicKey(this.config.getParams(), this.config.getPrivateKey()));
@@ -92,7 +123,6 @@ public class MainActivity extends AppCompatActivity {
             String junk = this.setParameters();
             this.config = tmp;
         }
-
     }
 
     public void saveSEALConfig(SEALConfig SEALConfig, String fileName){
@@ -115,7 +145,7 @@ public class MainActivity extends AppCompatActivity {
         try {
             input = new ObjectInputStream(new FileInputStream(new File(new File(getFilesDir(),"")+File.separator+fileName)));
             config = (SEALConfig) input.readObject();
-            Log.v("serialization","Config Uid="+SEALConfig.getSerialVersionUID());
+            //Log.v("serialization","Config Uid="+SEALConfig.getSerialVersionUID());
             input.close();
         } catch (StreamCorruptedException e) {
             e.printStackTrace();
@@ -250,29 +280,219 @@ public class MainActivity extends AppCompatActivity {
                     this.config.getPublicKey(), new double[]{this.latitude}));
             params.put("longitude", this.encryptDoubleArray(this.config.getParams(),
                     this.config.getPublicKey(), new double[]{this.longitude}));
+            params.put("device_id", this.config.getSerialVersionUID());
             this.EDPSRead.setText("Location sent!");
 
             JsonObjectRequest jsonObjectRequest = new JsonObjectRequest
-                    (Request.Method.POST, reqUrl, new JSONObject(params), new Response.Listener<JSONObject>() {
-
-                        @Override
-                        public void onResponse(JSONObject response) {
-                            EDPSRead.setText("Resp: " + response.toString());
-                        }
-                    }, new Response.ErrorListener() {
-
-                        @Override
-                        public void onErrorResponse(VolleyError error) {
+                    (Request.Method.POST, reqUrl, new JSONObject(params),
+                        response -> EDPSRead.setText("Resp: " + response.toString()),
+                        error -> {
                             // Handle error
                             EDPSRead.setText("Resp Err: " + error.getMessage());
                         }
-                    });
+                    );
 
             // Access the RequestQueue through your singleton class.
             MySingleton.getInstance(this).addToRequestQueue(jsonObjectRequest);
         } else {
             this.EDPSRead.setText("Location not sent, please select Get GPS Coordinates");
         }
+    }
+
+    public void onMap(View view){
+        JsonObjectRequest request = new JsonObjectRequest(
+            Request.Method.GET,
+            reqUrl2,
+            new JSONObject(),
+            response -> {
+                try {
+                    String reqUrl3 = response.getString("url");
+                    JsonObjectRequest jsonObjectRequest = new JsonObjectRequest
+                        (
+                            Request.Method.GET,
+                            reqUrl3,
+                            new JSONObject(),
+                            response1 -> {
+                                //System.out.println(response1.toString());
+                                PathsLocationData paths = null;
+                                try {
+                                    paths = mapper.readValue(response1.toString(), PathsLocationData.class);
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+                                if (paths != null) {
+                                    System.out.println("Got the paths");
+
+                                    // Decrypt path 1
+                                    ArrayList<LatLng> path1 = new ArrayList<>();
+                                    int i;
+                                    for (i = 0; i < paths.path1.path.size(); i++){
+                                        double lat = decryptDoubleArray(this.config.getParams(),
+                                            paths.path1.key,
+                                            paths.path1.path.get(i).latitude
+                                        )[0];
+                                        double lng = decryptDoubleArray(this.config.getParams(),
+                                                paths.path1.key,
+                                                paths.path1.path.get(i).longitude
+                                        )[0];
+                                        LatLng temp = new LatLng(lat, lng);
+                                        path1.add(temp);
+                                    }
+
+                                    // Decrypt path 2
+                                    ArrayList<LatLng> path2 = new ArrayList<>();
+                                    for (i = 0; i < paths.path2.path.size(); i++){
+                                        double lat = decryptDoubleArray(this.config.getParams(),
+                                                paths.path2.key,
+                                                paths.path2.path.get(i).latitude
+                                        )[0];
+                                        double lng = decryptDoubleArray(this.config.getParams(),
+                                                paths.path2.key,
+                                                paths.path2.path.get(i).longitude
+                                        )[0];
+                                        LatLng temp = new LatLng(lat, lng);
+                                        path2.add(temp);
+                                    }
+
+                                    System.out.println("Done");
+                                    Intent myIntent = new Intent(MainActivity.this, MapsMarkerActivity.class);
+                                    myIntent.putExtra("path1", path1);
+                                    myIntent.putExtra("path2", path2);
+                                    MainActivity.this.startActivity(myIntent);
+                                }
+                            },
+                            error -> {
+                                System.out.println(error.toString());
+                            }
+                        );
+                    int socketTimeout = 30000;//30 seconds - change to what you want
+                    RetryPolicy policy = new DefaultRetryPolicy(socketTimeout, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT);
+                    jsonObjectRequest.setRetryPolicy(policy);
+
+                    // Access the RequestQueue through your singleton class.
+                    MySingleton.getInstance(MainActivity.this.getApplicationContext()).addToRequestQueue(jsonObjectRequest);
+                } catch ( Exception e ) {
+                    e.printStackTrace();
+                }
+            },
+            error -> {
+                // Handle error
+                EDPSRead.setText("Resp Err: " + error.getMessage());
+            }
+        );
+        int socketTimeout = 30000;//30 seconds - change to what you want
+        RetryPolicy policy = new DefaultRetryPolicy(socketTimeout, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT);
+        request.setRetryPolicy(policy);
+        MySingleton.getInstance(this.getApplicationContext()).addToRequestQueue(request);
+    }
+
+//    public void startParsingTask() {
+//        Thread threadA = new Thread() {
+//            public void run() {
+//                ThreadB threadB = new ThreadB(getApplicationContext());
+//                JSONObject jsonObject = null;
+//                try {
+//                    jsonObject = threadB.execute().get(30, TimeUnit.SECONDS);
+//                } catch (InterruptedException e) {
+//                    e.printStackTrace();
+//                } catch (ExecutionException e) {
+//                    e.printStackTrace();
+//                } catch (TimeoutException e) {
+//                    e.printStackTrace();
+//                }
+//                final JSONObject receivedJSONObject = jsonObject;
+//                runOnUiThread(() -> {
+//                    EDPSRead.setText("Response is: " + receivedJSONObject);
+//                    if (receivedJSONObject != null) {
+//                        try {
+//                            reqUrl3 = receivedJSONObject.getString("url");
+//                        } catch (JSONException e) {
+//                            e.printStackTrace();
+//                        }
+//                    }
+//                });
+//            }
+//        };
+//        threadA.start();
+//    }
+//    private class ThreadB extends AsyncTask<Void, Void, JSONObject> {
+//        private Context mContext;
+//        public ThreadB(Context ctx) {
+//            mContext = ctx;
+//        }
+//        @Override
+//        protected JSONObject doInBackground(Void... params) {
+//            final RequestFuture<JSONObject> futureRequest = RequestFuture.newFuture();
+//            int socketTimeout = 30000;//30 seconds - change to what you want
+//            RetryPolicy policy = new DefaultRetryPolicy(socketTimeout, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT);
+//            final JsonObjectRequest jsonRequest = new JsonObjectRequest(Request.Method
+//                    .GET, reqUrl2,
+//                    new JSONObject(), futureRequest, futureRequest);
+//            jsonRequest.setTag(TAG);
+//            jsonRequest.setRetryPolicy(policy);
+//            MySingleton.getInstance(mContext.getApplicationContext()).addToRequestQueue(jsonRequest);
+//            try {
+//                return futureRequest.get(30, TimeUnit.SECONDS);
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            } catch (ExecutionException e) {
+//                e.printStackTrace();
+//            } catch (TimeoutException e) {
+//                e.printStackTrace();
+//            }
+//            return null;
+//        }
+//    }
+
+
+//    private class UrlRet extends AsyncTask<String, Void, String>{
+//        @Override
+//        protected void onPreExecute() {
+//            //super.onPreExecute();
+//            EDPSRead.setText("Starting call for URL");
+//        }
+//
+//        @Override
+//        protected String doInBackground(String... strings) {
+//            JSONObject urlObj = runJsonObjectRequest(Request.Method.GET, reqUrl2, new JSONObject());
+//            if (urlObj != null){
+//                try {
+//                    String url = urlObj.getString("url");
+//                    return url;
+//                } catch (JSONException e) {
+//                    e.printStackTrace();
+//                    return null;
+//                }
+//            }
+//            return null;
+//        }
+//    }
+
+    /**
+     * Runs a blocking Volley request
+     *
+     * @param method        get/put/post etc
+     * @param url           endpoint
+     * @param body          body of request
+     * @return the JSONObject result or exception: NOTE returns null once the onErrorResponse listener has been called
+     */
+    public JSONObject runJsonObjectRequest(int method, String url, JSONObject body) {
+        int socketTimeout = 30000;//30 seconds - change to what you want
+        RetryPolicy policy = new DefaultRetryPolicy(socketTimeout, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT);
+        RequestFuture<JSONObject> future = RequestFuture.newFuture();
+        JsonObjectRequest request = new JsonObjectRequest(method, url, body, future, future);
+        request.setRetryPolicy(policy);
+        MySingleton.getInstance(this.getApplicationContext()).addToRequestQueue(request);
+        try {
+            return future.get(30, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        } catch (TimeoutException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     // This method sets a parameter object and returns the object as a byte array

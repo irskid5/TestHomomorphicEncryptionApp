@@ -1,10 +1,11 @@
 package com.example.testhomomorphicencryptionapp;
 
 import java.io.Serializable;
+import java.util.UUID;
 
 public class SEALConfig implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+    private String serialVersionUID;
     private String params;
     private String privateKey;
     private String publicKey;
@@ -24,8 +25,8 @@ public class SEALConfig implements Serializable {
         return false;
     }
 
-    public static long getSerialVersionUID() {
-        return serialVersionUID;
+    public String getSerialVersionUID() {
+        return this.serialVersionUID;
     }
 
     public String getParams() {
@@ -38,6 +39,10 @@ public class SEALConfig implements Serializable {
 
     public String getPublicKey() {
         return publicKey;
+    }
+
+    public void setSerialVersionUID(String serialVersionUID) {
+        this.serialVersionUID = serialVersionUID;
     }
 
     public void setParams(String params) {
