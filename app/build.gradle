@@ -4,9 +4,9 @@ android {
     signingConfigs {
         release {
             storeFile file('C:\\Users\\Vele\\.android\\keys\\testEncryptionAppRelease.jks')
-            storePassword 'material'
+            storePassword 'coolbeans'
             keyAlias = 'key0'
-            keyPassword 'material'
+            keyPassword 'coolbeans'
         }
     }
     compileSdkVersion 29
